@@ -1,0 +1,46 @@
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:${STACK_VERSION}
+    container_name: paperagent-elasticsearch
+    restart: unless-stopped
+    mem_limit: 2g
+
+    environment:
+      - node.name=paperagent-es-01
+      - cluster.name=paperagent-local
+      - discovery.type=single-node
+
+      # Keep authentication enabled. HTTP is intentionally local-only rather
+      # than TLS-enabled because Docker publishes it to 127.0.0.1 only.
+      - xpack.security.enabled=true
+      - xpack.security.http.ssl.enabled=false
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+
+      # Development sizing. Increase together with Docker Desktop resources
+      # when the local corpus becomes large.
+      - ES_JAVA_OPTS=-Xms1g -Xmx1g
+
+    ports:
+      - "127.0.0.1:9200:9200"
+
+    volumes:
+      - paperagent_es_data:/usr/share/elasticsearch/data
+
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          curl --silent --fail -u "elastic:$$ELASTIC_PASSWORD"
+          "http://127.0.0.1:9200/_cluster/health?wait_for_status=yellow&timeout=5s"
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 45s
+
+volumes:
+  paperagent_es_data:

@@ -1,0 +1,16 @@
+{
+  "name": "@paperagent/parser-mineru",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./lib/index.mjs",
+  "types": "./lib/index.d.mts",
+  "exports": { ".": { "types": "./lib/index.d.mts", "default": "./lib/index.mjs" } },
+  "scripts": {
+    "check": "node ../../../deepseek-harness/node_modules/typescript/bin/tsc -p tsconfig.json --noEmit",
+    "build": "tsdown src/index.ts --format esm --dts --out-dir lib"
+  },
+  "dependencies": {
+    "@paperagent/domain": "workspace:*"
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "name": "paperagent-dsh-workspace",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Local-first paper assistant bundle for DeepSeek Harness.",
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "scripts": {
+    "test:domain": "node --experimental-strip-types --test tests/domain.test.ts",
+    "test:retrieval": "node --import ../deepseek-harness/node_modules/tsx/dist/loader.mjs --test tests/retrieval.test.ts",
+    "test:remote-contract": "node --import ../deepseek-harness/node_modules/tsx/dist/loader.mjs --test tests/remote-contract.test.ts",
+    "test:mineru-parser": "node ../deepseek-harness/node_modules/.pnpm/tsx@4.22.4/node_modules/tsx/dist/cli.mjs --tsconfig packages/parser-mineru/tsconfig.json --test tests/mineru-parser.test.ts",
+    "test:parse-jobs": "node --import ../deepseek-harness/node_modules/tsx/dist/loader.mjs --test tests/parse-jobs.test.ts",
+    "test:binary-downloader": "node --import ../deepseek-harness/node_modules/tsx/dist/loader.mjs --test tests/binary-downloader.test.ts",
+    "test:source-adapters": "node --import ../deepseek-harness/node_modules/tsx/dist/loader.mjs --test tests/source-adapters.test.ts",
+    "test:citations": "node --import ../deepseek-harness/node_modules/tsx/dist/loader.mjs --test tests/citations.test.ts",
+    "test:paper-research-skill": "node --import ../deepseek-harness/node_modules/tsx/dist/loader.mjs --test tests/paper-research-skill.test.ts",
+    "test:paper-writing-skill": "node --import ../deepseek-harness/node_modules/tsx/dist/loader.mjs --test tests/paper-writing-skill.test.ts",
+    "test:runtime-skills": "node --import ../deepseek-harness/node_modules/tsx/dist/loader.mjs --test tests/runtime-skill-markdown.test.ts",
+    "check:architecture": "node scripts/check-architecture.mjs",
+    "test:vision": "node --import ../deepseek-harness/node_modules/tsx/dist/loader.mjs --test tests/vision-client.test.ts",
+    "test:vision-jobs": "node ../deepseek-harness/node_modules/.pnpm/tsx@4.22.4/node_modules/tsx/dist/cli.mjs --tsconfig packages/tools/tsconfig.json --test tests/vision-jobs.test.ts",
+    "test:reranker": "node --import ../deepseek-harness/node_modules/tsx/dist/loader.mjs --test tests/reranker-dashscope.test.ts",
+    "e2e:browser": "node --import ../deepseek-harness/node_modules/tsx/dist/loader.mjs scripts/e2e-browser.mts",
+    "test:mineru-live": "node --import ../deepseek-harness/node_modules/tsx/dist/loader.mjs scripts/mineru-live.mts",
+    "smoke:remote": "node --import ../deepseek-harness/node_modules/tsx/dist/loader.mjs ./scripts/smoke-remote.ts",
+    "check": "node ../deepseek-harness/node_modules/typescript/bin/tsc -p tsconfig.json --noEmit && corepack pnpm --filter @paperagent/contracts run check && corepack pnpm --filter @paperagent/domain run check && corepack pnpm --filter @paperagent/parser-mineru run check && corepack pnpm --filter @paperagent/reranker-dashscope run check && corepack pnpm --filter @paperagent/retrieval run check && corepack pnpm --filter @paperagent/vision-deepseek run check && corepack pnpm --filter @paperagent/embedding-dashscope run check && corepack pnpm --filter @paperagent/retriever-elasticsearch run check && corepack pnpm --filter @paperagent/tools run check && corepack pnpm --filter @paperagent/dsh-paperagent run check && corepack pnpm --filter @paperagent/dsh-paperagent-ui run check",
+    "build:domain": "corepack pnpm --filter @paperagent/domain run build",
+    "build:parser": "corepack pnpm --filter @paperagent/parser-mineru run build",
+    "build:reranker": "corepack pnpm --filter @paperagent/reranker-dashscope run build",
+    "build:retrieval": "corepack pnpm --filter @paperagent/retrieval run build",
+    "build:vision": "corepack pnpm --filter @paperagent/vision-deepseek run build",
+    "build:embedding": "corepack pnpm --filter @paperagent/embedding-dashscope run build",
+    "build:elasticsearch": "corepack pnpm --filter @paperagent/retriever-elasticsearch run build",
+    "build:tools": "corepack pnpm --filter @paperagent/tools run build",
+    "build:host": "corepack pnpm run build:domain && corepack pnpm run build:parser && corepack pnpm run build:reranker && corepack pnpm run build:retrieval && corepack pnpm run build:vision && corepack pnpm run build:embedding && corepack pnpm run build:elasticsearch && corepack pnpm run build:tools",
+    "build:bundle": "corepack pnpm --filter @paperagent/dsh-paperagent run build",
+    "build:ui": "corepack pnpm --filter @paperagent/dsh-paperagent-ui run build",
+    "build": "corepack pnpm run build:host && corepack pnpm run build:ui && corepack pnpm run build:bundle",
+    "dev": "node ../deepseek-harness/apps/cli/lib/bin.js web --patch ./config/paperagent.dev.yml"
+  },
+  "dependencies": {
+    "@paperagent/domain": "workspace:*",
+    "@paperagent/parser-mineru": "workspace:*"
+  },
+  "devDependencies": {
+    "playwright": "^1.62.1",
+    "tsdown": "link:../deepseek-harness/node_modules/.pnpm/tsdown@0.22.2_oxc-resolver@_f113eb69000457c8d5954142d0822f52/node_modules/tsdown"
+  }
+}

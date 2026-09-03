@@ -1,0 +1,377 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      '@paperagent/domain':
+        specifier: workspace:*
+        version: link:packages/domain
+      '@paperagent/parser-mineru':
+        specifier: workspace:*
+        version: link:packages/parser-mineru
+    devDependencies:
+      playwright:
+        specifier: ^1.62.1
+        version: 1.62.1
+      tsdown:
+        specifier: link:../deepseek-harness/node_modules/.pnpm/tsdown@0.22.2_oxc-resolver@_f113eb69000457c8d5954142d0822f52/node_modules/tsdown
+        version: link:../deepseek-harness/node_modules/.pnpm/tsdown@0.22.2_oxc-resolver@_f113eb69000457c8d5954142d0822f52/node_modules/tsdown
+
+  packages/bundle:
+    dependencies:
+      '@deepseek-ai/dsh-client-ui-conversation':
+        specifier: link:../../../deepseek-harness/packages/client/ui-conversation
+        version: link:../../../deepseek-harness/packages/client/ui-conversation
+      '@deepseek-ai/dsh-client-ui-trajectory':
+        specifier: link:../../../deepseek-harness/packages/client/ui-trajectory
+        version: link:../../../deepseek-harness/packages/client/ui-trajectory
+      '@paperagent/tools':
+        specifier: link:../tools
+        version: link:../tools
+
+  packages/contracts:
+    dependencies:
+      '@deepseek-ai/dsh-session':
+        specifier: link:../../../deepseek-harness/packages/core/session
+        version: link:../../../deepseek-harness/packages/core/session
+
+  packages/domain: {}
+
+  packages/embedding-dashscope: {}
+
+  packages/parser-mineru:
+    dependencies:
+      '@paperagent/domain':
+        specifier: workspace:*
+        version: link:../domain
+
+  packages/reranker-dashscope: {}
+
+  packages/retrieval:
+    dependencies:
+      '@paperagent/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@paperagent/reranker-dashscope':
+        specifier: workspace:*
+        version: link:../reranker-dashscope
+
+  packages/retriever-elasticsearch: {}
+
+  packages/tools:
+    dependencies:
+      '@deepseek-ai/cordis':
+        specifier: link:../../../deepseek-harness/vendor/cordis
+        version: link:../../../deepseek-harness/vendor/cordis
+      '@deepseek-ai/dsh-credentials':
+        specifier: link:../../../deepseek-harness/packages/credentials/credentials
+        version: link:../../../deepseek-harness/packages/credentials/credentials
+      '@deepseek-ai/dsh-host-webserver':
+        specifier: link:../../../deepseek-harness/packages/host/webserver
+        version: link:../../../deepseek-harness/packages/host/webserver
+      '@deepseek-ai/dsh-session':
+        specifier: link:../../../deepseek-harness/packages/core/session
+        version: link:../../../deepseek-harness/packages/core/session
+      '@deepseek-ai/dsh-skill':
+        specifier: link:../../../deepseek-harness/packages/skill/skill
+        version: link:../../../deepseek-harness/packages/skill/skill
+      '@deepseek-ai/dsh-system-prompt':
+        specifier: link:../../../deepseek-harness/packages/core/system-prompt
+        version: link:../../../deepseek-harness/packages/core/system-prompt
+      '@deepseek-ai/dsh-tools':
+        specifier: link:../../../deepseek-harness/packages/core/tools
+        version: link:../../../deepseek-harness/packages/core/tools
+      '@deepseek-ai/dsh-typert-protocol':
+        specifier: link:../../../deepseek-harness/packages/typert/protocol
+        version: link:../../../deepseek-harness/packages/typert/protocol
+      '@deepseek-ai/schemastery':
+        specifier: link:../../../deepseek-harness/vendor/schemastery
+        version: link:../../../deepseek-harness/vendor/schemastery
+      '@paperagent/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@paperagent/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@paperagent/embedding-dashscope':
+        specifier: workspace:*
+        version: link:../embedding-dashscope
+      '@paperagent/parser-mineru':
+        specifier: workspace:*
+        version: link:../parser-mineru
+      '@paperagent/reranker-dashscope':
+        specifier: workspace:*
+        version: link:../reranker-dashscope
+      '@paperagent/retrieval':
+        specifier: workspace:*
+        version: link:../retrieval
+      '@paperagent/retriever-elasticsearch':
+        specifier: workspace:*
+        version: link:../retriever-elasticsearch
+      '@paperagent/vision-deepseek':
+        specifier: workspace:*
+        version: link:../vision-deepseek
+
+  packages/ui:
+    dependencies:
+      '@deepseek-ai/cordis':
+        specifier: link:../../../deepseek-harness/vendor/cordis
+        version: link:../../../deepseek-harness/vendor/cordis
+      '@deepseek-ai/dsh-api-remotes':
+        specifier: link:../../../deepseek-harness/packages/api/remotes
+        version: link:../../../deepseek-harness/packages/api/remotes
+      '@deepseek-ai/dsh-client-runtime':
+        specifier: link:../../../deepseek-harness/packages/client/runtime
+        version: link:../../../deepseek-harness/packages/client/runtime
+      '@deepseek-ai/dsh-client-ui-conversation':
+        specifier: link:../../../deepseek-harness/packages/client/ui-conversation
+        version: link:../../../deepseek-harness/packages/client/ui-conversation
+      '@deepseek-ai/dsh-client-ui-layout':
+        specifier: link:../../../deepseek-harness/packages/client/ui-layout
+        version: link:../../../deepseek-harness/packages/client/ui-layout
+      '@deepseek-ai/dsh-client-ui-primitives':
+        specifier: link:../../../deepseek-harness/packages/client/ui-primitives
+        version: link:../../../deepseek-harness/packages/client/ui-primitives
+      '@deepseek-ai/dsh-client-ui-settings':
+        specifier: link:../../../deepseek-harness/packages/client/ui-settings
+        version: link:../../../deepseek-harness/packages/client/ui-settings
+      '@deepseek-ai/dsh-client-ui-settings-general':
+        specifier: link:../../../deepseek-harness/packages/client/ui-settings-general
+        version: link:../../../deepseek-harness/packages/client/ui-settings-general
+      '@deepseek-ai/dsh-client-ui-sidebar':
+        specifier: link:../../../deepseek-harness/packages/client/ui-sidebar
+        version: link:../../../deepseek-harness/packages/client/ui-sidebar
+      '@deepseek-ai/dsh-client-ui-slots':
+        specifier: link:../../../deepseek-harness/packages/client/ui-slots
+        version: link:../../../deepseek-harness/packages/client/ui-slots
+      '@deepseek-ai/dsh-typert-protocol':
+        specifier: link:../../../deepseek-harness/packages/typert/protocol
+        version: link:../../../deepseek-harness/packages/typert/protocol
+      '@paperagent/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      pdfjs-dist:
+        specifier: ^6.2.108
+        version: 6.2.108
+      react:
+        specifier: 18.3.1
+        version: 18.3.1
+      zod:
+        specifier: 4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@types/react':
+        specifier: 18.3.26
+        version: 18.3.26
+
+  packages/vision-deepseek: {}
+
+packages:
+
+  '@napi-rs/canvas-android-arm64@1.0.8':
+    resolution: {integrity: sha512-5+nkh8i3gt6lqS/d2jTZ1xAn6tdgtB4Lf1mW6T0Qm5/rXNwBuV1sAEyLEWan5o9gJPU/GuvHR3rvSeZ+FaGrbw==}
+    engines: {node: '>= 10'}
+    cpu: [arm64]
+    os: [android]
+
+  '@napi-rs/canvas-darwin-arm64@1.0.8':
+    resolution: {integrity: sha512-7jQ47gi+fZ7KJmfc/5rNyy1CYw/cu4kZ0KPIYbo9UUgSdW0bKQJpt+WihEor6s4Lyp7+xc3a+3HeyXmAEbbnPg==}
+    engines: {node: '>= 10'}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@napi-rs/canvas-darwin-x64@1.0.8':
+    resolution: {integrity: sha512-rRjDMZs9pIRKGxgijwezplKc1RnJsqUokrA9h88bbTkqQ+7ePj0ZN4ZnZDy8Vu0tXs7KRlI2tQLaK4mx9QlxHg==}
+    engines: {node: '>= 10'}
+    cpu: [x64]
+    os: [darwin]
+
+  '@napi-rs/canvas-linux-arm-gnueabihf@1.0.8':
+    resolution: {integrity: sha512-jGcCd+8ra6Q61xKqZeiItujTpp9a9eRLcQ0jW6qYNku+WpupqOPFPY0SrsuSnXFviJwkpKYT9p7QrB4lsf3LNQ==}
+    engines: {node: '>= 10'}
+    cpu: [arm]
+    os: [linux]
+
+  '@napi-rs/canvas-linux-arm64-gnu@1.0.8':
+    resolution: {integrity: sha512-od6I2Y7kU7i1SwZYG2EKW8rWz6JiedtPpko4WEe1DDsiikrfaotVBCRaUTM5/yeZKaZ92EatoAS+5xG+6uJlYA==}
+    engines: {node: '>= 10'}
+    cpu: [arm64]
+    os: [linux]
+    libc: [glibc]
+
+  '@napi-rs/canvas-linux-arm64-musl@1.0.8':
+    resolution: {integrity: sha512-yYkPbJDJiWj6N0gASA3CAvRypZmVpJnxU0DQg3aBhneLDQde9TPLKADsQkobNoJUtTT/lj46aWpzT48PDb3Qcg==}
+    engines: {node: '>= 10'}
+    cpu: [arm64]
+    os: [linux]
+    libc: [musl]
+
+  '@napi-rs/canvas-linux-riscv64-gnu@1.0.8':
+    resolution: {integrity: sha512-PB00MSKAp4VwK/xwe6duKxRKmH8UH4GIl1pqHSbxng0jnU9Dr7FwaDypDiqwNFZ774N+8G7mJLGuLtg9NTcQsg==}
+    engines: {node: '>= 10'}
+    cpu: [riscv64]
+    os: [linux]
+    libc: [glibc]
+
+  '@napi-rs/canvas-linux-x64-gnu@1.0.8':
+    resolution: {integrity: sha512-TWM2XWJoitLiIPCvgJh7SriC+L/T9qkYCVzC66AidsZy0QP1hkKzBzVwshCdcA3q6fIn3yE0ISbq4lMJSy8jFw==}
+    engines: {node: '>= 10'}
+    cpu: [x64]
+    os: [linux]
+    libc: [glibc]
+
+  '@napi-rs/canvas-linux-x64-musl@1.0.8':
+    resolution: {integrity: sha512-hb20MxKXXb5IB7AAwN8UHz9WRsa2HmdZfjsDCzjElwJoeV1aotVEwFU4FrFQcYQVzsJQLeaCc/2Qdt/0Q72mMg==}
+    engines: {node: '>= 10'}
+    cpu: [x64]
+    os: [linux]
+    libc: [musl]
+
+  '@napi-rs/canvas-win32-arm64-msvc@1.0.8':
+    resolution: {integrity: sha512-WwPN08IXE4SkL+FhJyPz/iFnycMAUkbphFIT4cmKLlvbSU0Zfn1R7BGJ3Hqky1S89QUYc0Q4IOScXb/42Re9wQ==}
+    engines: {node: '>= 10'}
+    cpu: [arm64]
+    os: [win32]
+
+  '@napi-rs/canvas-win32-x64-msvc@1.0.8':
+    resolution: {integrity: sha512-XkrVqKb+pxyba7kjy2LJvABFVBTE0DNpEl7MrG4OYUmaWarrXH+t54z/Czj2YxCKtizYTV4mg6phNm3x24qjhQ==}
+    engines: {node: '>= 10'}
+    cpu: [x64]
+    os: [win32]
+
+  '@napi-rs/canvas@1.0.8':
+    resolution: {integrity: sha512-/SaLcvlqGWdm0HSCWMgHu7cjJiQXfP8/mOY+6dUyV9flQz7sPBBZ+ed2zYtoukojPmxOaL7bm+d/G4GeWWoN7g==}
+    engines: {node: '>= 10'}
+
+  '@types/prop-types@15.7.15':
+    resolution: {integrity: sha512-F6bEyamV9jKGAFBEmlQnesRPGOQqS2+Uwi0Em15xenOxHaf2hv6L8YCVn3rPdPJOiJfPiCnLIRyvwVaqMY3MIw==}
+
+  '@types/react@18.3.26':
+    resolution: {integrity: sha512-RFA/bURkcKzx/X9oumPG9Vp3D3JUgus/d0b67KB0t5S/raciymilkOa66olh78MUI92QLbEJevO7rvqU/kjwKA==}
+
+  csstype@3.2.3:
+    resolution: {integrity: sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==}
+
+  fsevents@2.3.2:
+    resolution: {integrity: sha512-xiqMQR4xAeHTuB9uWm+fFRcIOgKBMiOBP+eXiyT7jsgVCq1bkVygt00oASowB7EdtpOHaaPgKt812P9ab+DDKA==}
+    engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
+    os: [darwin]
+
+  js-tokens@4.0.0:
+    resolution: {integrity: sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ==}
+
+  loose-envify@1.4.0:
+    resolution: {integrity: sha512-lyuxPGr/Wfhrlem2CL/UcnUc1zcqKAImBDzukY7Y5F/yQiNdko6+fRLevlw1HgMySw7f611UIY408EtxRSoK3Q==}
+    hasBin: true
+
+  pdfjs-dist@6.2.108:
+    resolution: {integrity: sha512-YxFb+SQcodN2rnX9Tn3dHYlqfb7NjlzzfONPpJd+AKoKtUjEdevTfbC07d5TcczzOK6261auRkP/M8OBHs9vFQ==}
+    engines: {node: '>=22.13.0 || >=24'}
+
+  playwright-core@1.62.1:
+    resolution: {integrity: sha512-wPYSwEBJY9GHraISXqyqtx0na0LpO3XEX7jNDhntbex7tzUS7kLnZsOlFruFJB4Hi/rhDMjXGqHewDZ68nYZVw==}
+    engines: {node: '>=20'}
+    hasBin: true
+
+  playwright@1.62.1:
+    resolution: {integrity: sha512-0M+L3LAD8/nm554LOla9Ayx0j0tmFZ0FBcoQ7F1VuVHpM/XpiC8RcDzBQB8W5+hA8L22THxELzeF+2WcUzvcLg==}
+    engines: {node: '>=20'}
+    hasBin: true
+
+  react@18.3.1:
+    resolution: {integrity: sha512-wS+hAgJShR0KhEvPJArfuPVN1+Hz1t0Y6n5jLrGQbkb4urgPE/0Rve+1kMB1v/oWgHgm4WIcV+i7F2pTVj+2iQ==}
+    engines: {node: '>=0.10.0'}
+
+  zod@4.4.3:
+    resolution: {integrity: sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==}
+
+snapshots:
+
+  '@napi-rs/canvas-android-arm64@1.0.8':
+    optional: true
+
+  '@napi-rs/canvas-darwin-arm64@1.0.8':
+    optional: true
+
+  '@napi-rs/canvas-darwin-x64@1.0.8':
+    optional: true
+
+  '@napi-rs/canvas-linux-arm-gnueabihf@1.0.8':
+    optional: true
+
+  '@napi-rs/canvas-linux-arm64-gnu@1.0.8':
+    optional: true
+
+  '@napi-rs/canvas-linux-arm64-musl@1.0.8':
+    optional: true
+
+  '@napi-rs/canvas-linux-riscv64-gnu@1.0.8':
+    optional: true
+
+  '@napi-rs/canvas-linux-x64-gnu@1.0.8':
+    optional: true
+
+  '@napi-rs/canvas-linux-x64-musl@1.0.8':
+    optional: true
+
+  '@napi-rs/canvas-win32-arm64-msvc@1.0.8':
+    optional: true
+
+  '@napi-rs/canvas-win32-x64-msvc@1.0.8':
+    optional: true
+
+  '@napi-rs/canvas@1.0.8':
+    optionalDependencies:
+      '@napi-rs/canvas-android-arm64': 1.0.8
+      '@napi-rs/canvas-darwin-arm64': 1.0.8
+      '@napi-rs/canvas-darwin-x64': 1.0.8
+      '@napi-rs/canvas-linux-arm-gnueabihf': 1.0.8
+      '@napi-rs/canvas-linux-arm64-gnu': 1.0.8
+      '@napi-rs/canvas-linux-arm64-musl': 1.0.8
+      '@napi-rs/canvas-linux-riscv64-gnu': 1.0.8
+      '@napi-rs/canvas-linux-x64-gnu': 1.0.8
+      '@napi-rs/canvas-linux-x64-musl': 1.0.8
+      '@napi-rs/canvas-win32-arm64-msvc': 1.0.8
+      '@napi-rs/canvas-win32-x64-msvc': 1.0.8
+    optional: true
+
+  '@types/prop-types@15.7.15': {}
+
+  '@types/react@18.3.26':
+    dependencies:
+      '@types/prop-types': 15.7.15
+      csstype: 3.2.3
+
+  csstype@3.2.3: {}
+
+  fsevents@2.3.2:
+    optional: true
+
+  js-tokens@4.0.0: {}
+
+  loose-envify@1.4.0:
+    dependencies:
+      js-tokens: 4.0.0
+
+  pdfjs-dist@6.2.108:
+    optionalDependencies:
+      '@napi-rs/canvas': 1.0.8
+
+  playwright-core@1.62.1: {}
+
+  playwright@1.62.1:
+    dependencies:
+      playwright-core: 1.62.1
+    optionalDependencies:
+      fsevents: 2.3.2
+
+  react@18.3.1:
+    dependencies:
+      loose-envify: 1.4.0
+
+  zod@4.4.3: {}

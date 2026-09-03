@@ -1,0 +1,32 @@
+{
+  "name": "@paperagent/tools",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./lib/index.mjs",
+  "types": "./lib/index.d.mts",
+  "exports": { ".": { "types": "./lib/index.d.mts", "default": "./lib/index.mjs" } },
+  "scripts": {
+    "check": "node ../../../deepseek-harness/node_modules/typescript/bin/tsc -p tsconfig.json --noEmit",
+    "build": "tsdown src/index.ts --format esm --dts --out-dir lib && node ./scripts/copy-skill-resources.mjs"
+  },
+  "dependencies": {
+    "@paperagent/contracts": "workspace:*",
+    "@paperagent/domain": "workspace:*",
+    "@paperagent/embedding-dashscope": "workspace:*",
+    "@paperagent/parser-mineru": "workspace:*",
+    "@paperagent/retrieval": "workspace:*",
+    "@paperagent/reranker-dashscope": "workspace:*",
+    "@paperagent/retriever-elasticsearch": "workspace:*",
+    "@paperagent/vision-deepseek": "workspace:*",
+    "@deepseek-ai/cordis": "link:../../../deepseek-harness/vendor/cordis",
+    "@deepseek-ai/dsh-credentials": "link:../../../deepseek-harness/packages/credentials/credentials",
+    "@deepseek-ai/dsh-host-webserver": "link:../../../deepseek-harness/packages/host/webserver",
+    "@deepseek-ai/dsh-session": "link:../../../deepseek-harness/packages/core/session",
+    "@deepseek-ai/dsh-skill": "link:../../../deepseek-harness/packages/skill/skill",
+    "@deepseek-ai/dsh-system-prompt": "link:../../../deepseek-harness/packages/core/system-prompt",
+    "@deepseek-ai/dsh-tools": "link:../../../deepseek-harness/packages/core/tools",
+    "@deepseek-ai/dsh-typert-protocol": "link:../../../deepseek-harness/packages/typert/protocol",
+    "@deepseek-ai/schemastery": "link:../../../deepseek-harness/vendor/schemastery"
+  }
+}

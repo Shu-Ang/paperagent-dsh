@@ -1,0 +1,63 @@
+# This repository contains the two source trees only.
+# Local workspace data at the aggregate root
+/.paperagent/
+/.pnpm-store/
+/paperagent-recovery/
+
+# Dependencies and build output
+**/node_modules/
+**/lib/
+**/dist/
+**/coverage/
+**/*.tsbuildinfo
+**/.cache/
+**/.turbo/
+**/.vite/
+**/.corepack/
+
+# DSH and PaperAgent runtime state
+**/.dsh/
+**/.sessions/
+**/.storages/
+**/.artifacts/
+**/.local/
+**/.paperagent/
+**/.paperagent-build/
+**/uploads/
+**/tmp/
+**/*.log
+
+# Databases and search engine data
+**/*.sqlite
+**/*.sqlite-*
+**/*.db
+**/*.db-*
+**/infra/elasticsearch/data/
+
+# Environment files and credentials
+**/.env
+**/.env.*
+!**/.env.example
+**/.credentials
+**/.credentials.*
+**/credentials.json
+**/credentials*.json
+**/config/*.local.yml
+**/config/*.local.yaml
+**/*secret*.yml
+**/*secret*.yaml
+**/*secret*.json
+
+# Private key files
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+
+# Editor and OS files
+**/.idea/
+**/.vscode/
+**/.DS_Store
+
+# Preserved nested Git metadata from the old standalone repositories
+**/.git.backup/

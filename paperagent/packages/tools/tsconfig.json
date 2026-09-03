@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ES2024", "module": "ESNext", "moduleResolution": "bundler", "allowImportingTsExtensions": true,
+    "noEmit": true, "strict": true, "noUncheckedIndexedAccess": true, "exactOptionalPropertyTypes": true,
+    "skipLibCheck": true, "types": ["node"], "baseUrl": ".", "ignoreDeprecations": "6.0",
+    "paths": {
+      "@paperagent/contracts": ["../contracts/src/index.ts"],
+      "@paperagent/domain": ["../domain/src/index.ts"],
+      "@paperagent/embedding-dashscope": ["../embedding-dashscope/src/index.ts"],
+      "@paperagent/parser-mineru": ["../parser-mineru/src/index.ts"],
+      "@paperagent/retrieval": ["../retrieval/src/index.ts"],
+      "@paperagent/reranker-dashscope": ["../reranker-dashscope/src/index.ts"],
+      "@paperagent/retriever-elasticsearch": ["../retriever-elasticsearch/src/index.ts"],
+      "@paperagent/vision-deepseek": ["../vision-deepseek/src/index.ts"]
+    },
+    "typeRoots": ["../../../deepseek-harness/node_modules/.pnpm/@types+node@22.20.0/node_modules/@types"]
+  },
+  "include": ["src"]
+}

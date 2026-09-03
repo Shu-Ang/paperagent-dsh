@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ES2024",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
+    "declaration": true,
+    "rootDir": "src",
+    "outDir": "lib/types",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "ignoreDeprecations": "6.0",
+    "skipLibCheck": true,
+    "types": ["node"],
+    "typeRoots": ["../../../deepseek-harness/node_modules/.pnpm/@types+node@22.20.0/node_modules/@types"]
+  },
+  "include": ["src"]
+}

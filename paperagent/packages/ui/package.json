@@ -1,0 +1,57 @@
+{
+  "name": "@paperagent/dsh-paperagent-ui",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./lib/index.js",
+  "types": "./lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "types": "./lib/types/client/index.d.ts",
+      "default": "./lib/client.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-api-remotes",
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-ui-settings-general",
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-sidebar",
+        "@deepseek-ai/dsh-client-ui-conversation"
+      ],
+      "platform": "web"
+    }
+  },
+  "scripts": {
+    "check": "node ../../../deepseek-harness/node_modules/typescript/bin/tsc -p tsconfig.json --noEmit",
+    "build": "node ./scripts/clean-types.mjs && node ../../../deepseek-harness/node_modules/typescript/bin/tsc -p tsconfig.json && tsdown"
+  },
+  "dependencies": {
+    "@deepseek-ai/cordis": "link:../../../deepseek-harness/vendor/cordis",
+    "@deepseek-ai/dsh-api-remotes": "link:../../../deepseek-harness/packages/api/remotes",
+    "@deepseek-ai/dsh-client-runtime": "link:../../../deepseek-harness/packages/client/runtime",
+    "@deepseek-ai/dsh-client-ui-layout": "link:../../../deepseek-harness/packages/client/ui-layout",
+    "@deepseek-ai/dsh-client-ui-primitives": "link:../../../deepseek-harness/packages/client/ui-primitives",
+    "@deepseek-ai/dsh-client-ui-settings": "link:../../../deepseek-harness/packages/client/ui-settings",
+    "@deepseek-ai/dsh-client-ui-settings-general": "link:../../../deepseek-harness/packages/client/ui-settings-general",
+    "@deepseek-ai/dsh-client-ui-sidebar": "link:../../../deepseek-harness/packages/client/ui-sidebar",
+    "@deepseek-ai/dsh-client-ui-conversation": "link:../../../deepseek-harness/packages/client/ui-conversation",
+    "@deepseek-ai/dsh-client-ui-slots": "link:../../../deepseek-harness/packages/client/ui-slots",
+    "@deepseek-ai/dsh-typert-protocol": "link:../../../deepseek-harness/packages/typert/protocol",
+    "@paperagent/contracts": "workspace:*",
+    "pdfjs-dist": "^6.2.108",
+    "react": "18.3.1",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@types/react": "18.3.26"
+  }
+}

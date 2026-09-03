@@ -1,0 +1,19 @@
+# Copy the llm-pi-ai fragment into DSH_HOME/settings.yaml (or add it in DSH Settings → Models).
+# The API key itself remains a DSH credential named DEEPSEEK_API_KEY; never put it here.
+llm-pi-ai:
+  providers:
+    deepseek-vision:
+      displayName: DeepSeek Vision
+      apiKeyEnv: DEEPSEEK_API_KEY
+      api: openai-completions
+      baseURL: https://api.deepseek.com/v1
+      models:
+        - id: deepseek-v4-flash-vision-exp
+          name: DeepSeek-V4-Flash-Vision-Exp
+          contextWindow: 1000000
+          maxTokens: 384000
+          input: [text, image]
+          reasoningEfforts:
+            off:
+            high: high
+            max: max
