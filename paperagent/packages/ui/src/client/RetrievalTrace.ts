@@ -1,9 +1,8 @@
 /** Session-scoped RAG trace projection owned entirely by the PaperAgent plugin. */
 
-import type { Context } from '@deepseek-ai/cordis'
 import type {
   ConversationNodeContext, ConversationNodeDefinition, ConversationTimelineSnapshot,
-  ConversationViewBuilder, ConversationViewDefinition, ConversationViewNode,
+  ConversationViewBuilder, ConversationViewDefinition, ConversationViewNode, ConversationViewRegistry,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type { PaperRetrievalTraceEventData } from '@paperagent/contracts'
 
@@ -106,6 +105,6 @@ const retrievalViewDefinition: ConversationViewDefinition<
   create: () => new PaperAgentRetrievalSnapshotBuilder(),
 }
 
-export function registerPaperAgentRetrievalView(ctx: Context): void {
+export function registerPaperAgentRetrievalView(ctx: { readonly conversationViews: ConversationViewRegistry }): void {
   ctx.conversationViews.register(retrievalViewDefinition)
 }

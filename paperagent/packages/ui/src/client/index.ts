@@ -108,7 +108,7 @@ export async function apply(ctx: ClientContext): Promise<() => Promise<void>> {
         const sessions = ctx.sessions.list.getSnapshot()
         return sessions.current ?? sessions.ids[0]
       },
-      onCredentialUpdated: listener => ctx.remote.$on('credentials/updated', (ref) => {
+      onCredentialUpdated: listener => ctx.remote.$on('credentials/updated', (ref: string) => {
         if (ref === MINERU_TOKEN_REF || ref === DASHSCOPE_API_KEY_REF || ref === ELASTICSEARCH_API_KEY_REF) listener()
       }),
     }),
