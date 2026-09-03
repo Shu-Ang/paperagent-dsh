@@ -36,6 +36,16 @@ corepack pnpm install
 corepack pnpm build
 ```
 
+首次使用或目录移动后，需要把本地 PaperAgent bundle 重新安装到 DSH 的 `web` profile。先移除 profile 中可能存在的旧路径，再添加新路径：
+
+```powershell
+cd ..\deepseek-harness
+corepack pnpm dsh plugin --profile web remove @paperagent/dsh-paperagent
+corepack pnpm dsh plugin --profile web add ..\paperagent\packages\bundle
+```
+
+该命令会更新 `C:\Users\<用户名>\.dsh\profiles\web` 中的本地依赖链接；真实凭据仍保存在 DSH 用户目录，不进入本仓库。
+
 ## 启动
 
 ```powershell
