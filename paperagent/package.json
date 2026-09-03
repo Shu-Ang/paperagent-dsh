@@ -47,6 +47,7 @@
   },
   "devDependencies": {
     "playwright": "^1.62.1",
-    "tsdown": "0.22.2"
+    "tsdown": "0.22.2",
+    "typescript": "6.0.3"
   }
 }
