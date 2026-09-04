@@ -6,7 +6,7 @@ import type { PaperAgentStore, PaperEmbeddingSource, PaperRecord } from '@papera
 import type { DashScopeEmbeddingClient } from '@paperagent/embedding-dashscope'
 import type { ElasticsearchVectorIndex } from '@paperagent/retriever-elasticsearch'
 
-/** Durable derived-index worker. Failures change only the embedding job, never parse state. */
+/** Durable derived-index worker. It can build ES BM25-only documents or add vectors. */
 export class PaperEmbeddingJobs {
   private readonly active = new Set<string>()
   private readonly pending: string[] = []
@@ -18,7 +18,7 @@ export class PaperEmbeddingJobs {
   constructor(
     private readonly storePromise: Promise<PaperAgentStore>,
     private readonly options: { readonly provider: string; readonly model: string; readonly dimensions: number; readonly concurrency: number; readonly indexPrefix: string; readonly maxImageBytes: number },
-    private readonly clients: () => Promise<{ readonly embedder: DashScopeEmbeddingClient; readonly index: ElasticsearchVectorIndex }>,
+    private readonly clients: () => Promise<{ readonly embedder?: DashScopeEmbeddingClient; readonly index: ElasticsearchVectorIndex }>,
   ) {}
 
   async start(workspacePath: string, paperId: string): Promise<void> {
@@ -26,7 +26,7 @@ export class PaperEmbeddingJobs {
     const store = await this.storePromise
     const paper = store.getPaper(workspacePath, paperId)
     if (this.removedPapers.has(this.paperKey(paper.workspacePath, paper.id))) throw new Error('paper is being removed')
-    const settings = store.getVectorSettings(); if (!settings.embeddingEnabled || !settings.elasticsearchEnabled) return
+    const settings = store.getVectorSettings(); if (!settings.elasticsearchEnabled) return
     const job = store.createEmbeddingJob(workspacePath, paperId, this.options)
     this.enqueue(job.workspacePath, job.id)
   }
@@ -38,7 +38,7 @@ export class PaperEmbeddingJobs {
     const paper = store.getPaper(workspacePath, paperId)
     if (this.removedPapers.has(this.paperKey(paper.workspacePath, paper.id))) throw new Error('paper is being removed')
     const settings = store.getVectorSettings()
-    if (!settings.embeddingEnabled || !settings.elasticsearchEnabled) {
+    if (!settings.elasticsearchEnabled) {
       throw new Error('请先在 PaperAgent 设置中启用 Embedding 和 Elasticsearch 索引')
     }
     const job = store.restartEmbeddingJob(workspacePath, paperId, this.options)
@@ -157,22 +157,26 @@ export class PaperEmbeddingJobs {
     job = store.updateEmbeddingJob(workspacePath, jobId, { status: 'processing', error: null, startedAt: new Date().toISOString(), finishedAt: null })
     try {
       const paper = this.currentPaper(store, workspacePath, job.paperId, job.parseRevision, paperKey)
-      const { embedder, index } = await this.clients()
+      const clients = await this.clients()
+      const index = clients.index
+      // The persisted switch is authoritative at execution time. This lets
+      // users turn vectors off while keeping the ES BM25 projection usable.
+      const embedder = store.getVectorSettings().embeddingEnabled ? clients.embedder : undefined
       const chunksIndex = `${this.options.indexPrefix}-chunks-v1`, elementsIndex = `${this.options.indexPrefix}-elements-v1`
-      await Promise.all([index.ensureIndex(chunksIndex, this.options.dimensions), index.ensureIndex(elementsIndex, this.options.dimensions)])
+      await Promise.all([index.ensureIndex(chunksIndex, embedder === undefined ? undefined : this.options.dimensions), index.ensureIndex(elementsIndex, embedder === undefined ? undefined : this.options.dimensions)])
       const currentWorkspaceKey = hash(canonicalWorkspace(paper.workspacePath))
       let completed = 0
       const documents: Array<Parameters<ElasticsearchVectorIndex['upsert']>[1][number]> = []
       for (const source of store.listEmbeddingSources(workspacePath, paper.id)) {
         this.currentPaper(store, workspacePath, job.paperId, job.parseRevision, paperKey)
-        const image = await this.imageFor(paper, source)
-        const embedding = await embedder.embed({ text: source.text, ...(image === undefined ? {} : { image }) })
+        const image = embedder === undefined ? undefined : await this.imageFor(paper, source)
+        const embedding = embedder === undefined ? undefined : await embedder.embed({ text: source.text, ...(image === undefined ? {} : { image }) })
         this.currentPaper(store, workspacePath, job.paperId, job.parseRevision, paperKey)
         documents.push({
           id: identity(source), workspaceKey: currentWorkspaceKey, libraryId: source.libraryId, paperId: source.paperId, sourceId: source.sourceId,
-          sourceKind: source.kind, section: source.section, pdfPageStart: source.pdfPageStart, pdfPageEnd: source.pdfPageEnd,
-          ...(source.elementType === undefined ? {} : { elementType: source.elementType }), contentRevision: source.parseRevision,
-          embeddingProvider: this.options.provider, embeddingModel: this.options.model, embedding, content: source.text,
+          sourceKind: source.kind, title: source.title, section: source.section, pdfPageStart: source.pdfPageStart, pdfPageEnd: source.pdfPageEnd,
+          ...(source.elementType === undefined ? {} : { elementType: source.elementType }), ...(source.caption === undefined ? {} : { caption: source.caption }), contentRevision: source.parseRevision,
+          ...(embedding === undefined ? {} : { embeddingProvider: this.options.provider, embeddingModel: this.options.model, embedding }), content: source.text,
         })
         completed += 1
         this.currentPaper(store, workspacePath, job.paperId, job.parseRevision, paperKey)

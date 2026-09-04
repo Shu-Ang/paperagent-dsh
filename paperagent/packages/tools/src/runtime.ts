@@ -2,7 +2,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import { readFile } from 'node:fs/promises'
 import { extname } from 'node:path'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
-import type { PaperAgentStore } from '@paperagent/domain'
+import type { PaperAgentStore, PaperElementType, PaperSearchFilter } from '@paperagent/domain'
 import { MineruPrecisionParser } from '@paperagent/parser-mineru'
 import type { MineruModelVersion, MineruPrecisionConfig } from '@paperagent/parser-mineru'
 import { DeepSeekVisionClient } from '@paperagent/vision-deepseek'
@@ -10,6 +10,7 @@ import { DashScopeEmbeddingClient } from '@paperagent/embedding-dashscope'
 import { normalizeElasticsearchNodeUrl, testElasticsearchConnection } from '@paperagent/retriever-elasticsearch'
 import { ElasticsearchVectorIndex } from '@paperagent/retriever-elasticsearch'
 import { HybridPaperRetriever, SqlitePaperRetriever } from '@paperagent/retrieval'
+import type { HybridSearchBackend } from '@paperagent/retrieval'
 import { RerankingPaperRetriever } from '@paperagent/retrieval'
 import { DashScopeReranker } from '@paperagent/reranker-dashscope'
 import type { PaperReranker } from '@paperagent/reranker-dashscope'
@@ -90,17 +91,28 @@ export function createElasticsearchConnectionTester(ctx: Context, config: Elasti
  * PaperAgent switches decide whether a newly parsed paper is indexed.
  */
 export function createEmbeddingJobs(ctx: Context, embedding: EmbeddingPluginConfig | undefined, elasticsearch: ElasticsearchPluginConfig | undefined, store: Promise<PaperAgentStore>) {
-  if (embedding?.enabled !== true || elasticsearch?.enabled !== true) return undefined
-  const dashScopeCredential = credentialRef(embedding.credentialRef)
+  if (elasticsearch?.enabled !== true) return undefined
+  const embeddingEnabled = embedding?.enabled === true
+  const dashScopeCredential = embeddingEnabled && embedding !== undefined ? credentialRef(embedding.credentialRef) : undefined
   const elasticsearchCredential = credentialRef(elasticsearch.apiKeyRef)
   return new PaperEmbeddingJobs(store, {
-    provider: 'dashscope', model: embedding.model, dimensions: embedding.dimensions, concurrency: embedding.concurrency, indexPrefix: elasticsearch.indexPrefix, maxImageBytes: embedding.maxImageBytes,
+    provider: embeddingEnabled ? 'dashscope' : 'none', model: embeddingEnabled && embedding !== undefined ? embedding.model : 'none', dimensions: embedding?.dimensions ?? 1024, concurrency: embedding?.concurrency ?? 2, indexPrefix: elasticsearch.indexPrefix, maxImageBytes: embedding?.maxImageBytes ?? 10 * 1024 * 1024,
   }, async () => {
-    const [dashScopeKey, elasticsearchKey] = await Promise.all([ctx.credentials.resolve(dashScopeCredential), ctx.credentials.resolve(elasticsearchCredential)])
+    const vectorSwitch = embeddingEnabled && (await store).getVectorSettings().embeddingEnabled
+    const [dashScopeKey, elasticsearchKey] = await Promise.all([
+      dashScopeCredential === undefined || !vectorSwitch ? Promise.resolve(undefined) : ctx.credentials.resolve(dashScopeCredential),
+      ctx.credentials.resolve(elasticsearchCredential),
+    ])
+    if (!vectorSwitch) {
+      if (elasticsearchKey === undefined) throw new Error(`Elasticsearch API Key is not configured: ${elasticsearchCredential}`)
+      return { index: new ElasticsearchVectorIndex({ nodeUrl: elasticsearch.nodeUrl, apiKey: elasticsearchKey.value, timeoutMs: elasticsearch.timeoutMs }) }
+    }
     if (dashScopeKey === undefined) throw new Error(`paperagent DashScope API Key 未配置：${dashScopeCredential}`)
     if (elasticsearchKey === undefined) throw new Error(`paperagent Elasticsearch API Key 未配置：${elasticsearchCredential}`)
     return {
-      embedder: new DashScopeEmbeddingClient({ apiKey: dashScopeKey.value, model: embedding.model, dimensions: embedding.dimensions, timeoutMs: embedding.timeoutMs }),
+      ...(dashScopeKey === undefined || embedding === undefined || !embeddingEnabled ? {} : {
+        embedder: new DashScopeEmbeddingClient({ apiKey: dashScopeKey.value, model: embedding.model, dimensions: embedding.dimensions, timeoutMs: embedding.timeoutMs }),
+      }),
       index: new ElasticsearchVectorIndex({ nodeUrl: elasticsearch.nodeUrl, apiKey: elasticsearchKey.value, timeoutMs: elasticsearch.timeoutMs }),
     }
   })
@@ -118,7 +130,10 @@ export function createPaperRetriever(
   reranker: RerankerPluginConfig | undefined,
   store: Promise<PaperAgentStore>,
 ): PaperRetriever {
-  const base = embedding?.enabled !== true || elasticsearch?.enabled !== true
+  // Elasticsearch enables the lexical BM25 path independently from the
+  // optional DashScope embedding path.  The retriever still falls back to
+  // SQLite when the ES request fails or returns no hydrated candidates.
+  const base = elasticsearch?.enabled !== true
     ? new SqlitePaperRetriever(store)
     : createHybridRetriever(ctx, embedding, elasticsearch, store)
   if (reranker === undefined || !reranker.enabled) return base
@@ -156,14 +171,47 @@ function imageMime(extension: string): string | undefined {
 
 function createHybridRetriever(
   ctx: Context,
-  embedding: EmbeddingPluginConfig,
+  embedding: EmbeddingPluginConfig | undefined,
   elasticsearch: ElasticsearchPluginConfig,
   store: Promise<PaperAgentStore>,
 ): PaperRetriever {
-  const dashScopeCredential = credentialRef(embedding.credentialRef)
   const elasticsearchCredential = credentialRef(elasticsearch.apiKeyRef)
-  return new HybridPaperRetriever(store, {
-    async embedQuery(query) {
+  const searchElasticText = async (input: {
+    query: string
+    workspaceKey: string
+    limit: number
+    filter: PaperSearchFilter
+    types?: readonly PaperElementType[]
+    sourceKind: 'chunk' | 'element'
+  }) => {
+    const settings = (await store).getVectorSettings()
+    if (!settings.elasticsearchEnabled) throw new Error('Elasticsearch retrieval is disabled in PaperAgent settings')
+    const key = await ctx.credentials.resolve(elasticsearchCredential)
+    if (key === undefined) throw new Error(`Elasticsearch API Key is not configured: ${elasticsearchCredential}`)
+    const index = new ElasticsearchVectorIndex({ nodeUrl: elasticsearch.nodeUrl, apiKey: key.value, timeoutMs: elasticsearch.timeoutMs })
+    return index.searchText({
+      index: `${elasticsearch.indexPrefix}-${input.sourceKind === 'chunk' ? 'chunks' : 'elements'}-v1`,
+      query: input.query, workspaceKey: input.workspaceKey, limit: input.limit,
+      ...(input.filter.libraryId === undefined ? {} : { libraryId: input.filter.libraryId }),
+      ...(input.filter.paperIds === undefined ? {} : { paperIds: input.filter.paperIds }),
+      ...(input.filter.section === undefined ? {} : { section: input.filter.section }),
+      ...(input.types === undefined ? {} : { elementTypes: input.types }),
+      sourceKind: input.sourceKind,
+    })
+  }
+
+  const backend: HybridSearchBackend = {
+    async searchChunksLexical(input) {
+      return searchElasticText({ ...input, sourceKind: 'chunk' })
+    },
+    async searchElementsLexical(input) {
+      return searchElasticText({ ...input, sourceKind: 'element' })
+    },
+  }
+  if (embedding?.enabled === true) {
+    const dashScopeCredential = credentialRef(embedding.credentialRef)
+    Object.assign(backend, {
+      async embedQuery(query: string) {
       const settings = (await store).getVectorSettings()
       if (!settings.embeddingEnabled || !settings.elasticsearchEnabled) {
         throw new Error('vector retrieval is disabled in PaperAgent settings')
@@ -176,8 +224,8 @@ function createHybridRetriever(
       return new DashScopeEmbeddingClient({
         apiKey: key.value, model: embedding.model, dimensions: embedding.dimensions, timeoutMs: embedding.timeoutMs,
       }).embed({ text: query })
-    },
-    async searchChunks(input) {
+      },
+      async searchChunks(input: Parameters<NonNullable<HybridSearchBackend['searchChunks']>>[0]) {
       const settings = (await store).getVectorSettings()
       if (!settings.embeddingEnabled || !settings.elasticsearchEnabled) {
         throw new Error('vector retrieval is disabled in PaperAgent settings')
@@ -191,8 +239,8 @@ function createHybridRetriever(
         ...(input.filter.paperIds === undefined ? {} : { paperIds: input.filter.paperIds }),
         ...(input.filter.section === undefined ? {} : { section: input.filter.section }), sourceKind: 'chunk',
       })
-    },
-    async searchElements(input) {
+      },
+      async searchElements(input: Parameters<NonNullable<HybridSearchBackend['searchElements']>>[0]) {
       const settings = (await store).getVectorSettings()
       if (!settings.embeddingEnabled || !settings.elasticsearchEnabled) {
         throw new Error('vector retrieval is disabled in PaperAgent settings')
@@ -207,8 +255,10 @@ function createHybridRetriever(
         ...(input.filter.section === undefined ? {} : { section: input.filter.section }),
         ...(input.types === undefined ? {} : { elementTypes: input.types }), sourceKind: 'element',
       })
-    },
-  })
+      },
+    })
+  }
+  return new HybridPaperRetriever(store, backend)
 }
 
 function createPaperReranker(ctx: Context, config: RerankerPluginConfig): PaperReranker {

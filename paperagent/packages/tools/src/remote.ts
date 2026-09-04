@@ -270,7 +270,7 @@ export class PaperAgentRemoteService extends TypertRemoteService {
     return this.config.parseJobs.start(this.workspaceOf(sessionId), paperId)
   }
 
-  /** Rebuilds the optional derived vector index without reparsing the PDF. */
+  /** Rebuilds the optional derived BM25/vector index without reparsing the PDF. */
   async reindexPaper(sessionId: string, paperId: string) {
     if (this.config.embedding === undefined) throw new Error('PaperAgent 向量索引服务不可用')
     const job = await this.config.embedding.restart(this.workspaceOf(sessionId), paperId)

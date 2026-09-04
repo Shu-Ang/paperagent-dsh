@@ -21,7 +21,7 @@ export function buildEmbeddingSources(input: EmbeddingProjectionInput): PaperEmb
   const figuresByElement = new Map(input.figures.filter(figure => figure.elementId !== null).map(figure => [figure.elementId as string, figure]))
   const sources: PaperEmbeddingSource[] = chunks.map(chunk => ({
     sourceId: `chunk:${chunk.id}`,
-    kind: 'chunk', paperId: input.paper.id, workspacePath: input.paper.workspacePath, libraryId: input.paper.libraryId,
+    kind: 'chunk', paperId: input.paper.id, title: input.paper.title, workspacePath: input.paper.workspacePath, libraryId: input.paper.libraryId,
     parseRevision: revision, section: chunk.section, pdfPageStart: chunk.pdfPageStart, pdfPageEnd: chunk.pdfPageEnd,
     text: labelled([['Section', chunk.section], ['Text', chunk.content]]), contextChunkIds: [], contextReason: 'none',
   }))
@@ -41,9 +41,10 @@ export function buildEmbeddingSources(input: EmbeddingProjectionInput): PaperEmb
     ]
     sources.push({
       sourceId: `element:${element.id}`,
-      kind: 'element', paperId: input.paper.id, workspacePath: input.paper.workspacePath, libraryId: input.paper.libraryId,
+      kind: 'element', paperId: input.paper.id, title: input.paper.title, workspacePath: input.paper.workspacePath, libraryId: input.paper.libraryId,
       parseRevision: revision, section: element.section, pdfPageStart: element.pdfPageStart, pdfPageEnd: element.pdfPageEnd,
-      elementType: element.elementType, text: labelled(fields), contextChunkIds: context.chunkIds, contextReason: context.reason,
+      elementType: element.elementType, ...(element.caption === null || element.caption.trim() === '' ? {} : { caption: element.caption }),
+      text: labelled(fields), contextChunkIds: context.chunkIds, contextReason: context.reason,
       ...(figure === undefined ? {} : { image: { relativePath: figure.relativePath, mimeType: figure.mimeType } }),
     })
   }

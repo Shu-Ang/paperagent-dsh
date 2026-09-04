@@ -18,7 +18,7 @@ import type {
   PaperSearchFilter,
 } from '@paperagent/domain'
 
-export type RetrievalMode = 'sqlite' | 'vector' | 'hybrid'
+export type RetrievalMode = 'sqlite' | 'lexical' | 'vector' | 'hybrid'
 export type RetrievalTraceStageKind = 'sqlite' | 'embedding' | 'elasticsearch' | 'fusion' | 'rerank' | 'final'
 export type RetrievalTraceStageStatus = 'completed' | 'skipped' | 'fallback' | 'failed'
 
@@ -33,6 +33,8 @@ export interface RetrievalTraceCandidate {
   readonly score?: number
   readonly sqliteRank?: number
   readonly elasticRank?: number
+  readonly elasticKeywordRank?: number
+  readonly elasticVectorRank?: number
   readonly fusionScore?: number
   readonly rerankScore?: number
   readonly excerpt: string
@@ -42,7 +44,7 @@ export interface RetrievalTraceStage {
   readonly kind: RetrievalTraceStageKind
   readonly status: RetrievalTraceStageStatus
   readonly durationMs: number
-  readonly method?: 'fts' | 'knn' | 'rrf' | 'dashscope-rerank'
+  readonly method?: 'fts' | 'bm25' | 'knn' | 'rrf' | 'dashscope-rerank'
   readonly reason?: string
   readonly candidates: readonly RetrievalTraceCandidate[]
 }
@@ -253,23 +255,38 @@ export interface VectorCandidate {
 }
 
 export interface HybridSearchBackend {
-  /** Returns a query vector in the same dimensions as the current index. */
-  embedQuery(query: string): Promise<readonly number[]>
-  /** Returns only workspace-filtered vector candidates, never citation text. */
-  searchChunks(input: {
-    readonly vector: readonly number[]
+  /** Returns only workspace-filtered BM25 candidates, never citation text. */
+  searchChunksLexical(input: {
+    readonly query: string
     readonly workspaceKey: string
     readonly limit: number
     readonly filter: PaperSearchFilter
   }): Promise<readonly VectorCandidate[]>
-  /** Searches the separately versioned element projection. */
-  searchElements(input: {
-    readonly vector: readonly number[]
+  /** Searches structured elements using Elastic BM25. */
+  searchElementsLexical(input: {
+    readonly query: string
     readonly workspaceKey: string
     readonly limit: number
     readonly filter: PaperSearchFilter
     readonly types?: readonly PaperElementType[]
   }): Promise<readonly VectorCandidate[]>
+  /** Returns a query vector in the same dimensions as the current index. */
+  embedQuery?: (query: string) => Promise<readonly number[]>
+  /** Returns only workspace-filtered vector candidates, never citation text. */
+  searchChunks?: (input: {
+    readonly vector: readonly number[]
+    readonly workspaceKey: string
+    readonly limit: number
+    readonly filter: PaperSearchFilter
+  }) => Promise<readonly VectorCandidate[]>
+  /** Searches the separately versioned element projection. */
+  searchElements?: (input: {
+    readonly vector: readonly number[]
+    readonly workspaceKey: string
+    readonly limit: number
+    readonly filter: PaperSearchFilter
+    readonly types?: readonly PaperElementType[]
+  }) => Promise<readonly VectorCandidate[]>
 }
 
 export interface HybridRetrieverOptions {
@@ -301,9 +318,12 @@ export class HybridPaperRetriever implements PaperRetriever {
     return this.hybridSearch({
       input,
       local: () => store.searchPaperChunks(input.workspacePath, input.query, this.candidateLimit, filter),
-      searchVector: vector => this.backend.searchChunks({
-        vector, workspaceKey: workspaceKey(input.workspacePath), limit: this.candidateLimit, filter,
+      searchLexical: query => this.backend.searchChunksLexical({
+        query, workspaceKey: workspaceKey(input.workspacePath), limit: this.candidateLimit, filter,
       }),
+      ...(this.backend.searchChunks === undefined ? {} : { searchVector: (vector: readonly number[]) => this.backend.searchChunks!({
+        vector, workspaceKey: workspaceKey(input.workspacePath), limit: this.candidateLimit, filter,
+      }) }),
       sourceId: chunkId,
       hydrate: ids => store.getPaperChunkCitationsByIds(input.workspacePath, ids, filter),
       hydratedId: hit => hit.id,
@@ -320,10 +340,13 @@ export class HybridPaperRetriever implements PaperRetriever {
         workspacePath: input.workspacePath, query: input.query, limit: this.candidateLimit,
         types, filter,
       }),
-      searchVector: vector => this.backend.searchElements({
+      searchLexical: query => this.backend.searchElementsLexical({
+        query, workspaceKey: workspaceKey(input.workspacePath), limit: this.candidateLimit, filter, types,
+      }),
+      ...(this.backend.searchElements === undefined ? {} : { searchVector: (vector: readonly number[]) => this.backend.searchElements!({
         vector, workspaceKey: workspaceKey(input.workspacePath), limit: this.candidateLimit, filter,
         types,
-      }),
+      }) }),
       sourceId: elementId,
       hydrate: ids => store.getPaperElementCitationsByIds({
         workspacePath: input.workspacePath, elementIds: ids,
@@ -338,10 +361,13 @@ export class HybridPaperRetriever implements PaperRetriever {
     return this.hybridSearch({
       input,
       local: () => store.searchPaperFigures(input.workspacePath, input.query, this.candidateLimit),
-      searchVector: vector => this.backend.searchElements({
+      searchLexical: query => this.backend.searchElementsLexical({
+        query, workspaceKey: workspaceKey(input.workspacePath), limit: this.candidateLimit, filter: {}, types: ['figure'],
+      }),
+      ...(this.backend.searchElements === undefined ? {} : { searchVector: (vector: readonly number[]) => this.backend.searchElements!({
         vector, workspaceKey: workspaceKey(input.workspacePath), limit: this.candidateLimit,
         filter: {}, types: ['figure'],
-      }),
+      }) }),
       sourceId: elementId,
       hydrate: ids => store.getPaperFigureCitationsByElementIds(input.workspacePath, ids),
       hydratedId: hit => hit.elementId,
@@ -351,7 +377,8 @@ export class HybridPaperRetriever implements PaperRetriever {
   private async hybridSearch<Hit extends TraceableHit>(options: {
     readonly input: ChunkRetrievalInput | ElementRetrievalInput | FigureRetrievalInput
     readonly local: () => readonly Hit[]
-    readonly searchVector: (vector: readonly number[]) => Promise<readonly VectorCandidate[]>
+    readonly searchLexical: (query: string) => Promise<readonly VectorCandidate[]>
+    readonly searchVector?: ((vector: readonly number[]) => Promise<readonly VectorCandidate[]>) | undefined
     readonly sourceId: (sourceId: string) => string | undefined
     readonly hydrate: (ids: readonly string[]) => readonly Hit[]
     readonly hydratedId: (hit: Hit) => string | null | undefined
@@ -359,66 +386,88 @@ export class HybridPaperRetriever implements PaperRetriever {
     const limit = bounded(options.input.limit ?? 6, 1, 20)
     const sqliteStarted = now()
     const sqlitePromise = Promise.resolve(options.local())
+    const lexicalStarted = now()
+    const lexicalPromise = (async () => {
+      try {
+        return { candidates: await options.searchLexical(options.input.query), durationMs: elapsed(lexicalStarted) }
+      } catch (error) {
+        return { error, durationMs: elapsed(lexicalStarted) }
+      }
+    })()
     const embeddingStarted = now()
     let embeddingCompleted = false
-    const vectorPromise = this.backend.embedQuery(options.input.query)
-      .then(async vector => {
-        embeddingCompleted = true
-        options.input.trace?.stage({ kind: 'embedding', status: 'completed', durationMs: elapsed(embeddingStarted), candidates: [] })
-        const elasticStarted = now()
-        const candidates = await options.searchVector(vector)
-        return { candidates, durationMs: elapsed(elasticStarted) }
-      })
+    const vectorPromise = this.backend.embedQuery === undefined || options.searchVector === undefined
+      ? Promise.resolve({ skipped: true as const })
+      : (async () => {
+        try {
+          const vector = await this.backend.embedQuery!(options.input.query)
+          embeddingCompleted = true
+          options.input.trace?.stage({ kind: 'embedding', status: 'completed', durationMs: elapsed(embeddingStarted), candidates: [] })
+          const elasticStarted = now()
+          return { candidates: await options.searchVector!(vector), durationMs: elapsed(elasticStarted) }
+        } catch (error) {
+          return { error, durationMs: elapsed(embeddingStarted) }
+        }
+      })()
 
-    const sqliteHits = await sqlitePromise
-    options.input.trace?.stage(traceStage('sqlite', 'completed', sqliteStarted, sqliteHits, { method: 'fts', sqliteRanks: true }))
-    try {
-      const vector = await vectorPromise
-      const sourceIds = vector.candidates
-        .map(candidate => options.sourceId(candidate.sourceId))
-        .filter((id): id is string => id !== undefined)
+    const [sqliteHits, lexicalResult, vectorResult] = await Promise.all([sqlitePromise, lexicalPromise, vectorPromise])
+    const hydrateCandidates = (candidates: readonly VectorCandidate[]) => {
+      const sourceIds = candidates.map(candidate => options.sourceId(candidate.sourceId)).filter((id): id is string => id !== undefined)
       const hydrationById = new Map(options.hydrate(sourceIds).flatMap(hit => {
         const id = options.hydratedId(hit)
         return id === null || id === undefined ? [] : [[id, hit] as const]
       }))
-      const elasticHits = vector.candidates.flatMap(candidate => {
+      return candidates.flatMap(candidate => {
         const id = options.sourceId(candidate.sourceId)
         const hit = id === undefined ? undefined : hydrationById.get(id)
         return hit === undefined ? [] : [{ hit, score: candidate.score }]
       })
-      options.input.trace?.stage({
-        kind: 'elasticsearch', status: 'completed', durationMs: vector.durationMs, method: 'knn',
-        candidates: elasticHits.slice(0, 30).map(({ hit, score }, index) => candidateFor(hit, index + 1, { score, elasticRank: index + 1 })),
-      })
-      const merged = fuse(sqliteHits, elasticHits, this.rrfK)
-      options.input.trace?.stage({
-        kind: 'fusion', status: 'completed', durationMs: 0, method: 'rrf',
-        candidates: merged.slice(0, 30).map((entry, index) => candidateFor(entry.hit, index + 1, {
-          ...(entry.sqliteRank === undefined ? {} : { sqliteRank: entry.sqliteRank }),
-          ...(entry.elasticRank === undefined ? {} : { elasticRank: entry.elasticRank }),
-          fusionScore: entry.score,
-        })),
-      })
-      const finalEntries = merged.slice(0, limit)
-      const hits = finalEntries.map(entry => entry.hit)
-      options.input.trace?.stage({
-        kind: 'final', status: 'completed', durationMs: 0,
-        candidates: finalEntries.map((entry, index) => candidateFor(entry.hit, index + 1, {
-          ...(entry.sqliteRank === undefined ? {} : { sqliteRank: entry.sqliteRank }),
-          ...(entry.elasticRank === undefined ? {} : { elasticRank: entry.elasticRank }),
-          fusionScore: entry.score,
-        })),
-      })
-      return { mode: 'hybrid', hits }
-    } catch (error) {
-      const reason = safeReason(error)
-      options.input.trace?.stage({
-        kind: embeddingCompleted ? 'elasticsearch' : 'embedding',
-        status: 'fallback', durationMs: elapsed(embeddingStarted), reason, candidates: [],
-      })
-      options.input.trace?.stage(traceStage('final', 'fallback', now(), sqliteHits.slice(0, limit), { reason, sqliteRanks: true }))
-      return { mode: 'sqlite', hits: sqliteHits.slice(0, limit) }
     }
+
+    const lexicalFailed = 'error' in lexicalResult
+    const lexicalHits = lexicalFailed ? [] : hydrateCandidates(lexicalResult.candidates)
+    options.input.trace?.stage(lexicalFailed
+      ? { kind: 'elasticsearch', status: 'fallback', durationMs: lexicalResult.durationMs, method: 'bm25', reason: safeReason(lexicalResult.error), candidates: [] }
+      : { kind: 'elasticsearch', status: 'completed', durationMs: lexicalResult.durationMs, method: 'bm25', candidates: lexicalHits.slice(0, 30).map(({ hit, score }, index) => candidateFor(hit, index + 1, { score, elasticKeywordRank: index + 1 })) })
+
+    const vectorSkipped = 'skipped' in vectorResult
+    const vectorFailed = !vectorSkipped && 'error' in vectorResult
+    let vectorHits: { readonly hit: Hit; readonly score?: number }[] = []
+    if (!('skipped' in vectorResult) && !('error' in vectorResult)) vectorHits = hydrateCandidates(vectorResult.candidates)
+    if (vectorSkipped) {
+      options.input.trace?.stage({ kind: 'embedding', status: 'skipped', durationMs: 0, reason: 'embedding is disabled', candidates: [] })
+      options.input.trace?.stage({ kind: 'elasticsearch', status: 'skipped', durationMs: 0, method: 'knn', reason: 'embedding is disabled', candidates: [] })
+    } else if (vectorFailed) {
+      const reason = safeReason(vectorResult.error)
+      options.input.trace?.stage({ kind: embeddingCompleted ? 'elasticsearch' : 'embedding', status: 'fallback', durationMs: vectorResult.durationMs, ...(embeddingCompleted ? { method: 'knn' as const } : {}), reason, candidates: [] })
+    } else {
+      options.input.trace?.stage({ kind: 'elasticsearch', status: 'completed', durationMs: vectorResult.durationMs, method: 'knn', candidates: vectorHits.slice(0, 30).map(({ hit, score }, index) => candidateFor(hit, index + 1, { ...(score === undefined ? {} : { score }), elasticVectorRank: index + 1, elasticRank: index + 1 })) })
+    }
+
+    const useSqliteFallback = lexicalFailed || lexicalHits.length === 0
+    const sources: Array<{ readonly kind: 'sqlite' | 'elasticKeyword' | 'elasticVector'; readonly hits: readonly { readonly hit: Hit; readonly score?: number }[] }> = []
+    if (useSqliteFallback) sources.push({ kind: 'sqlite', hits: sqliteHits.map(hit => ({ hit })) })
+    if (!useSqliteFallback) sources.push({ kind: 'elasticKeyword', hits: lexicalHits })
+    if (vectorHits.length > 0) sources.push({ kind: 'elasticVector', hits: vectorHits })
+    const merged = fuseSources(sources, this.rrfK)
+    const fallbackReason = useSqliteFallback && !lexicalFailed ? 'Elasticsearch BM25 returned no candidates' : lexicalFailed ? safeReason(lexicalResult.error) : undefined
+    if (useSqliteFallback) options.input.trace?.stage(traceStage('sqlite', 'fallback', sqliteStarted, sqliteHits, { method: 'fts', ...(fallbackReason === undefined ? {} : { reason: fallbackReason }), sqliteRanks: true }))
+    options.input.trace?.stage(sources.length > 1
+      ? { kind: 'fusion', status: 'completed', durationMs: 0, method: 'rrf', candidates: merged.slice(0, 30).map((entry, index) => candidateFor(entry.hit, index + 1, {
+        ...(entry.sqliteRank === undefined ? {} : { sqliteRank: entry.sqliteRank }), ...(entry.elasticKeywordRank === undefined ? {} : { elasticKeywordRank: entry.elasticKeywordRank }),
+        ...(entry.elasticVectorRank === undefined ? {} : { elasticVectorRank: entry.elasticVectorRank, elasticRank: entry.elasticVectorRank }), fusionScore: entry.score,
+      })) }
+      : { kind: 'fusion', status: 'skipped', durationMs: 0, method: 'rrf', reason: 'single retrieval source', candidates: [] })
+    const finalEntries = merged.slice(0, limit)
+    const finalStatus: RetrievalTraceStageStatus = useSqliteFallback && vectorHits.length === 0 ? 'fallback' : 'completed'
+    options.input.trace?.stage({ kind: 'final', status: finalStatus, durationMs: 0, ...(fallbackReason === undefined ? {} : { reason: fallbackReason }), candidates: finalEntries.map((entry, index) => candidateFor(entry.hit, index + 1, {
+      ...(entry.sqliteRank === undefined ? {} : { sqliteRank: entry.sqliteRank }), ...(entry.elasticKeywordRank === undefined ? {} : { elasticKeywordRank: entry.elasticKeywordRank }),
+      ...(entry.elasticVectorRank === undefined ? {} : { elasticVectorRank: entry.elasticVectorRank, elasticRank: entry.elasticVectorRank }), fusionScore: entry.score,
+    })) })
+    const mode: RetrievalMode = vectorHits.length > 0
+      ? (sources.length > 1 ? 'hybrid' : 'vector')
+      : (useSqliteFallback ? 'sqlite' : 'lexical')
+    return { mode, hits: finalEntries.map(entry => entry.hit) }
   }
 }
 
@@ -433,21 +482,50 @@ function dedupeHits<Hit extends TraceableHit>(hits: readonly Hit[]): Hit[] {
   })
 }
 
-function fuse<Hit extends TraceableHit>(
-  sqliteHits: readonly Hit[],
-  elasticHits: readonly { readonly hit: Hit; readonly score: number }[],
+type RetrievalSourceKind = 'sqlite' | 'elasticKeyword' | 'elasticVector'
+
+interface RetrievalSource<Hit extends TraceableHit> {
+  readonly kind: RetrievalSourceKind
+  readonly hits: readonly { readonly hit: Hit; readonly score?: number }[]
+}
+
+interface FusedRetrievalEntry<Hit extends TraceableHit> {
+  readonly hit: Hit
+  readonly sqliteRank?: number
+  readonly elasticKeywordRank?: number
+  readonly elasticVectorRank?: number
+  /** Kept for compatibility with older trace consumers. */
+  readonly elasticRank?: number
+  readonly score: number
+}
+
+/** Reciprocal-rank fusion across the enabled local, lexical and vector sources. */
+function fuseSources<Hit extends TraceableHit>(
+  sources: readonly RetrievalSource<Hit>[],
   rrfK: number,
-): Array<{ readonly hit: Hit; readonly sqliteRank?: number; readonly elasticRank?: number; readonly score: number }> {
-  const merged = new Map<string, { hit: Hit; sqliteRank?: number; elasticRank?: number; score: number }>()
-  for (const [index, hit] of sqliteHits.entries()) {
-    const rank = index + 1
-    merged.set(hit.id, { hit, sqliteRank: rank, score: 1 / (rrfK + rank) })
-  }
-  for (const [index, entry] of elasticHits.entries()) {
-    const rank = index + 1
-    const current = merged.get(entry.hit.id)
-    if (current === undefined) merged.set(entry.hit.id, { hit: entry.hit, elasticRank: rank, score: 1 / (rrfK + rank) })
-    else merged.set(entry.hit.id, { ...current, elasticRank: rank, score: current.score + 1 / (rrfK + rank) })
+): FusedRetrievalEntry<Hit>[] {
+  const merged = new Map<string, {
+    hit: Hit
+    sqliteRank?: number
+    elasticKeywordRank?: number
+    elasticVectorRank?: number
+    elasticRank?: number
+    score: number
+  }>()
+  for (const source of sources) {
+    for (const [index, entry] of source.hits.entries()) {
+      const rank = index + 1
+      const current = merged.get(entry.hit.id)
+      const next = current ?? { hit: entry.hit, score: 0 }
+      if (source.kind === 'sqlite') next.sqliteRank ??= rank
+      if (source.kind === 'elasticKeyword') next.elasticKeywordRank ??= rank
+      if (source.kind === 'elasticVector') {
+        next.elasticVectorRank ??= rank
+        next.elasticRank ??= rank
+      }
+      next.score += 1 / (rrfK + rank)
+      merged.set(entry.hit.id, next)
+    }
   }
   return [...merged.values()].sort((left, right) => right.score - left.score || left.hit.id.localeCompare(right.hit.id))
 }
@@ -491,7 +569,7 @@ function traceStage(
   status: RetrievalTraceStageStatus,
   startedAt: number,
   hits: readonly (PaperCitation | PaperElementCitation | PaperFigureCitation)[],
-  details: { readonly method?: 'fts' | 'knn' | 'rrf'; readonly reason?: string; readonly sqliteRanks?: boolean } = {},
+  details: { readonly method?: 'fts' | 'bm25' | 'knn' | 'rrf'; readonly reason?: string; readonly sqliteRanks?: boolean } = {},
 ): RetrievalTraceStage {
   return {
     kind, status, durationMs: elapsed(startedAt),
@@ -505,7 +583,7 @@ function traceStage(
 function candidateFor(
   hit: PaperCitation | PaperElementCitation | PaperFigureCitation,
   rank: number,
-  details: { readonly score?: number; readonly sqliteRank?: number; readonly elasticRank?: number; readonly fusionScore?: number; readonly rerankScore?: number } = {},
+  details: { readonly score?: number; readonly sqliteRank?: number; readonly elasticRank?: number; readonly elasticKeywordRank?: number; readonly elasticVectorRank?: number; readonly fusionScore?: number; readonly rerankScore?: number } = {},
 ): RetrievalTraceCandidate {
   const citation = 'sectionTitle' in hit
     ? { sourceId: hit.id, paperId: hit.paperId, title: hit.title, section: hit.sectionTitle, pdfPageStart: hit.pdfPage, excerpt: hit.rawCaption }
@@ -517,6 +595,8 @@ function candidateFor(
     ...(details.score === undefined ? {} : { score: details.score }),
     ...(details.sqliteRank === undefined ? {} : { sqliteRank: details.sqliteRank }),
     ...(details.elasticRank === undefined ? {} : { elasticRank: details.elasticRank }),
+    ...(details.elasticKeywordRank === undefined ? {} : { elasticKeywordRank: details.elasticKeywordRank }),
+    ...(details.elasticVectorRank === undefined ? {} : { elasticVectorRank: details.elasticVectorRank }),
     ...(details.fusionScore === undefined ? {} : { fusionScore: details.fusionScore }),
     ...(details.rerankScore === undefined ? {} : { rerankScore: details.rerankScore }),
   }

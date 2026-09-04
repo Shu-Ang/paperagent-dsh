@@ -375,6 +375,8 @@ export interface PaperEmbeddingSource {
   readonly sourceId: string
   readonly kind: EmbeddingSourceKind
   readonly paperId: string
+  /** Paper title is duplicated into the rebuildable ES projection for lexical search. */
+  readonly title: string
   readonly workspacePath: string
   readonly libraryId: string | null
   readonly parseRevision: string
@@ -382,6 +384,8 @@ export interface PaperEmbeddingSource {
   readonly pdfPageStart: number
   readonly pdfPageEnd: number
   readonly elementType?: PaperElementType
+  /** Structured caption, when the source is a figure/table/equation element. */
+  readonly caption?: string
   readonly text: string
   readonly contextChunkIds: readonly string[]
   readonly contextReason: EmbeddingContextReason

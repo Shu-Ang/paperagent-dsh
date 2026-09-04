@@ -20,9 +20,9 @@ export interface Config {
   readonly maxDownloadRedirects: number
   readonly mineru: MineruPluginConfig
   readonly vision?: VisionPluginConfig
-  /** Optional DashScope embedding settings. Disabled until the index pipeline exists. */
+  /** Optional DashScope embedding settings for the ES kNN branch. */
   readonly embedding?: EmbeddingPluginConfig
-  /** Optional Elasticsearch endpoint for the derived vector index. */
+  /** Optional Elasticsearch endpoint for derived BM25/kNN indexes. */
   readonly elasticsearch?: ElasticsearchPluginConfig
   /** Optional DashScope final reranking stage. */
   readonly reranker?: RerankerPluginConfig

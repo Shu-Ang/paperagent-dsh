@@ -21,14 +21,16 @@ export interface ElasticsearchVectorDocument {
   readonly paperId: string
   readonly sourceId: string
   readonly sourceKind: 'chunk' | 'element'
+  readonly title: string
   readonly section: string
   readonly pdfPageStart: number
   readonly pdfPageEnd: number
   readonly elementType?: string
+  readonly caption?: string
   readonly contentRevision: string
-  readonly embeddingProvider: string
-  readonly embeddingModel: string
-  readonly embedding: readonly number[]
+  readonly embeddingProvider?: string
+  readonly embeddingModel?: string
+  readonly embedding?: readonly number[]
 }
 
 /** A minimal, backend-neutral vector candidate. Local SQLite must hydrate it before use. */
@@ -39,9 +41,29 @@ export interface ElasticsearchVectorCandidate {
   readonly score: number
 }
 
+/** Candidate returned by the Elastic lexical/BM25 projection. */
+export interface ElasticsearchTextCandidate {
+  readonly sourceId: string
+  readonly sourceKind: 'chunk' | 'element'
+  readonly paperId: string
+  readonly score: number
+}
+
 export interface ElasticsearchKnnSearchInput {
   readonly index: string
   readonly vector: readonly number[]
+  readonly workspaceKey: string
+  readonly limit: number
+  readonly libraryId?: string
+  readonly paperIds?: readonly string[]
+  readonly section?: string
+  readonly elementTypes?: readonly string[]
+  readonly sourceKind?: 'chunk' | 'element'
+}
+
+export interface ElasticsearchTextSearchInput {
+  readonly index: string
+  readonly query: string
   readonly workspaceKey: string
   readonly limit: number
   readonly libraryId?: string
@@ -109,11 +131,11 @@ export async function testElasticsearchConnection(config: ElasticsearchConnectio
   }
 }
 
-/** Minimal versioned-index writer. It stores only rebuildable search projections and vectors. */
+/** Minimal versioned-index writer. It stores only rebuildable BM25/search projections and vectors. */
 export class ElasticsearchVectorIndex {
   constructor(private readonly config: ElasticsearchConnectionConfig) {}
 
-  async ensureIndex(index: string, dimensions: number): Promise<void> {
+  async ensureIndex(index: string, dimensions?: number): Promise<void> {
     const existing = await this.request('HEAD', `/${encodeURIComponent(index)}`)
     if (existing.status === 200) {
       // An existing index keeps its dense-vector dimension forever. Silently
@@ -122,17 +144,27 @@ export class ElasticsearchVectorIndex {
       const mapping = await this.request('GET', `/${encodeURIComponent(index)}/_mapping`)
       if (mapping.status !== 200) throw new Error(`Elasticsearch index mapping check failed: HTTP ${mapping.status}`)
       const payload: unknown = await mapping.json()
-      const actual = embeddingDimensions(payload, index)
-      if (actual !== dimensions) throw new Error(`Elasticsearch index ${index} uses ${actual === undefined ? 'an unknown' : actual} embedding dimensions; configured value is ${dimensions}. Recreate the index or restore the matching embedding configuration.`)
+      if (dimensions !== undefined) {
+        const actual = embeddingDimensions(payload, index)
+        if (actual === undefined) {
+          const added = await this.request('PUT', `/${encodeURIComponent(index)}/_mapping`, {
+            properties: { embedding: { type: 'dense_vector', dims: dimensions, index: true, similarity: 'cosine' } },
+          })
+          if (added.status !== 200) throw new Error(`Elasticsearch embedding mapping update failed: HTTP ${added.status}`)
+        } else if (actual !== dimensions) {
+          throw new Error(`Elasticsearch index ${index} uses ${actual} embedding dimensions; configured value is ${dimensions}. Recreate the index or restore the matching embedding configuration.`)
+        }
+      }
       return
     }
     if (existing.status !== 404) throw new Error(`Elasticsearch index check failed: HTTP ${existing.status}`)
     const created = await this.request('PUT', `/${encodeURIComponent(index)}`, {
       mappings: { properties: {
         workspace_key: { type: 'keyword' }, library_id: { type: 'keyword' }, paper_id: { type: 'keyword' }, source_id: { type: 'keyword' }, source_kind: { type: 'keyword' },
-        section: { type: 'keyword' }, pdf_page_start: { type: 'integer' }, pdf_page_end: { type: 'integer' }, element_type: { type: 'keyword' },
-        content_revision: { type: 'keyword' }, embedding_provider: { type: 'keyword' }, embedding_model: { type: 'keyword' }, content: { type: 'text' },
-        embedding: { type: 'dense_vector', dims: dimensions, index: true, similarity: 'cosine' },
+        title: { type: 'text', fields: { keyword: { type: 'keyword', ignore_above: 512 } } },
+        section: { type: 'keyword' }, caption: { type: 'text' }, pdf_page_start: { type: 'integer' }, pdf_page_end: { type: 'integer' }, element_type: { type: 'keyword' },
+        content_revision: { type: 'keyword' }, embedding_provider: { type: 'keyword' }, embedding_model: { type: 'keyword' }, content: { type: 'text' }, search_text: { type: 'text' },
+        ...(dimensions === undefined ? {} : { embedding: { type: 'dense_vector', dims: dimensions, index: true, similarity: 'cosine' } }),
       } },
     })
     if (created.status !== 200 && created.status !== 201) throw new Error(`Elasticsearch index creation failed: HTTP ${created.status}`)
@@ -144,9 +176,12 @@ export class ElasticsearchVectorIndex {
     for (const document of documents) {
       lines.push(JSON.stringify({ index: { _index: index, _id: document.id } }))
       lines.push(JSON.stringify({ workspace_key: document.workspaceKey, library_id: document.libraryId, paper_id: document.paperId, source_id: document.sourceId,
-        source_kind: document.sourceKind, section: document.section, pdf_page_start: document.pdfPageStart, pdf_page_end: document.pdfPageEnd,
-        ...(document.elementType === undefined ? {} : { element_type: document.elementType }), content_revision: document.contentRevision,
-        embedding_provider: document.embeddingProvider, embedding_model: document.embeddingModel, embedding: document.embedding, content: document.content }))
+        source_kind: document.sourceKind, title: document.title, section: document.section, pdf_page_start: document.pdfPageStart, pdf_page_end: document.pdfPageEnd,
+        ...(document.elementType === undefined ? {} : { element_type: document.elementType }), ...(document.caption === undefined ? {} : { caption: document.caption }), content_revision: document.contentRevision,
+        ...(document.embeddingProvider === undefined ? {} : { embedding_provider: document.embeddingProvider }),
+        ...(document.embeddingModel === undefined ? {} : { embedding_model: document.embeddingModel }),
+        ...(document.embedding === undefined ? {} : { embedding: document.embedding }), content: document.content,
+        search_text: [document.title, document.section, document.caption ?? '', document.content].filter(Boolean).join('\n') }))
     }
     const response = await this.request('POST', '/_bulk', lines.join('\n') + '\n', 'application/x-ndjson')
     if (response.status < 200 || response.status >= 300) throw new Error(`Elasticsearch bulk write failed: HTTP ${response.status}`)
@@ -204,22 +239,7 @@ export class ElasticsearchVectorIndex {
       throw new Error('Elasticsearch kNN query vector must contain finite values')
     }
     const limit = Math.min(Math.max(Math.trunc(input.limit), 1), 50)
-    const filters: unknown[] = [{ term: { workspace_key: input.workspaceKey } }]
-    if (input.libraryId !== undefined) filters.push({ term: { library_id: input.libraryId } })
-    const paperIds = [...new Set(input.paperIds ?? [])].filter(id => id.trim() !== '').slice(0, 100)
-    if (paperIds.length > 0) filters.push({ terms: { paper_id: paperIds } })
-    if (input.section !== undefined && input.section.trim() !== '') {
-      const section = escapeWildcard(input.section.trim())
-      filters.push({ bool: { should: [
-        { term: { section: input.section.trim() } },
-        { wildcard: { section: { value: `* > ${section}`, case_insensitive: false } } },
-        { wildcard: { section: { value: `* > ${section} > *`, case_insensitive: false } } },
-        { wildcard: { section: { value: `${section} > *`, case_insensitive: false } } },
-      ], minimum_should_match: 1 } })
-    }
-    const elementTypes = [...new Set(input.elementTypes ?? [])].filter(type => type.trim() !== '').slice(0, 20)
-    if (elementTypes.length > 0) filters.push({ terms: { element_type: elementTypes } })
-    if (input.sourceKind !== undefined) filters.push({ term: { source_kind: input.sourceKind } })
+    const filters = searchFilters(input)
     const response = await this.request('POST', `/${encodeURIComponent(input.index)}/_search`, {
       size: limit,
       _source: ['source_id', 'source_kind', 'paper_id'],
@@ -231,6 +251,28 @@ export class ElasticsearchVectorIndex {
     if (response.status !== 200) throw new Error(`Elasticsearch kNN search failed: HTTP ${response.status}`)
     const payload: unknown = await response.json()
     return readKnnCandidates(payload, limit)
+  }
+
+  /** Executes a workspace-scoped Elastic full-text query using BM25. */
+  async searchText(input: ElasticsearchTextSearchInput): Promise<readonly ElasticsearchTextCandidate[]> {
+    const query = input.query.trim()
+    if (query === '') throw new Error('Elasticsearch text query must not be empty')
+    const limit = Math.min(Math.max(Math.trunc(input.limit), 1), 50)
+    const fields = input.sourceKind === 'element'
+      ? ['title^3', 'caption^2', 'section^1.5', 'search_text', 'content']
+      : ['title^3', 'section^1.5', 'search_text', 'content']
+    const response = await this.request('POST', `/${encodeURIComponent(input.index)}/_search`, {
+      size: limit,
+      _source: ['source_id', 'source_kind', 'paper_id'],
+      query: { bool: {
+        must: [{ multi_match: { query, fields, type: 'best_fields', operator: 'or' } }],
+        filter: searchFilters(input),
+      } },
+      sort: [{ _score: 'desc' }, { pdf_page_start: 'asc' }],
+    })
+    if (response.status !== 200) throw new Error(`Elasticsearch BM25 search failed: HTTP ${response.status}`)
+    const payload: unknown = await response.json()
+    return readTextCandidates(payload, limit)
   }
 
   private async request(method: string, path: string, body?: unknown, contentType = 'application/json'): Promise<Response> {
@@ -255,6 +297,26 @@ function escapeWildcard(value: string): string {
   return value.replace(/[\\*?]/g, match => `\\${match}`)
 }
 
+function searchFilters(input: Pick<ElasticsearchKnnSearchInput, 'workspaceKey' | 'libraryId' | 'paperIds' | 'section' | 'elementTypes' | 'sourceKind'>): unknown[] {
+  const filters: unknown[] = [{ term: { workspace_key: input.workspaceKey } }]
+  if (input.libraryId !== undefined) filters.push({ term: { library_id: input.libraryId } })
+  const paperIds = [...new Set(input.paperIds ?? [])].filter(id => id.trim() !== '').slice(0, 100)
+  if (paperIds.length > 0) filters.push({ terms: { paper_id: paperIds } })
+  if (input.section !== undefined && input.section.trim() !== '') {
+    const section = escapeWildcard(input.section.trim())
+    filters.push({ bool: { should: [
+      { term: { section: input.section.trim() } },
+      { wildcard: { section: { value: `* > ${section}`, case_insensitive: false } } },
+      { wildcard: { section: { value: `* > ${section} > *`, case_insensitive: false } } },
+      { wildcard: { section: { value: `${section} > *`, case_insensitive: false } } },
+    ], minimum_should_match: 1 } })
+  }
+  const elementTypes = [...new Set(input.elementTypes ?? [])].filter(type => type.trim() !== '').slice(0, 20)
+  if (elementTypes.length > 0) filters.push({ terms: { element_type: elementTypes } })
+  if (input.sourceKind !== undefined) filters.push({ term: { source_kind: input.sourceKind } })
+  return filters
+}
+
 function readKnnCandidates(payload: unknown, limit: number): readonly ElasticsearchVectorCandidate[] {
   if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) {
     throw new Error('Elasticsearch kNN search returned an invalid response')
@@ -262,6 +324,30 @@ function readKnnCandidates(payload: unknown, limit: number): readonly Elasticsea
   const hits = (payload as { hits?: { hits?: unknown } }).hits?.hits
   if (!Array.isArray(hits)) throw new Error('Elasticsearch kNN search returned no hits')
   const candidates: ElasticsearchVectorCandidate[] = []
+  const seen = new Set<string>()
+  for (const hit of hits) {
+    if (typeof hit !== 'object' || hit === null || Array.isArray(hit)) continue
+    const row = hit as { _score?: unknown; _source?: { source_id?: unknown; source_kind?: unknown; paper_id?: unknown } }
+    const source = row._source
+    if (source === undefined || typeof source.source_id !== 'string' || typeof source.paper_id !== 'string'
+      || (source.source_kind !== 'chunk' && source.source_kind !== 'element')
+      || typeof row._score !== 'number' || !Number.isFinite(row._score)) continue
+    const identity = `${source.source_kind}\u0000${source.source_id}`
+    if (seen.has(identity)) continue
+    seen.add(identity)
+    candidates.push({ sourceId: source.source_id, sourceKind: source.source_kind, paperId: source.paper_id, score: row._score })
+    if (candidates.length >= limit) break
+  }
+  return candidates
+}
+
+function readTextCandidates(payload: unknown, limit: number): readonly ElasticsearchTextCandidate[] {
+  if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) {
+    throw new Error('Elasticsearch BM25 search returned an invalid response')
+  }
+  const hits = (payload as { hits?: { hits?: unknown } }).hits?.hits
+  if (!Array.isArray(hits)) throw new Error('Elasticsearch BM25 search returned no hits')
+  const candidates: ElasticsearchTextCandidate[] = []
   const seen = new Set<string>()
   for (const hit of hits) {
     if (typeof hit !== 'object' || hit === null || Array.isArray(hit)) continue

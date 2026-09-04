@@ -52,6 +52,9 @@ function stageFor(run: PaperRetrievalTraceEventDataV1, tab: Exclude<DetailTab, '
 function score(candidate: PaperRetrievalTraceCandidate): string {
   if (candidate.rerankScore !== undefined) return 'Rerank ' + candidate.rerankScore.toFixed(4)
   if (candidate.fusionScore !== undefined) return `RRF ${candidate.fusionScore.toFixed(4)}`
+  if (candidate.elasticKeywordRank !== undefined && candidate.elasticVectorRank !== undefined) return `BM25 #${candidate.elasticKeywordRank} · kNN #${candidate.elasticVectorRank}`
+  if (candidate.elasticKeywordRank !== undefined) return `BM25 #${candidate.elasticKeywordRank}`
+  if (candidate.elasticVectorRank !== undefined) return `kNN #${candidate.elasticVectorRank}`
   if (candidate.score !== undefined) return `kNN ${candidate.score.toFixed(4)}`
   if (candidate.sqliteRank !== undefined) return `FTS #${candidate.sqliteRank}`
   return '—'

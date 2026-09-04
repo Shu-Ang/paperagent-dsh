@@ -15,6 +15,8 @@ export interface PaperRetrievalTraceCandidate {
   readonly score?: number
   readonly sqliteRank?: number
   readonly elasticRank?: number
+  readonly elasticKeywordRank?: number
+  readonly elasticVectorRank?: number
   readonly fusionScore?: number
   readonly rerankScore?: number
   readonly excerpt: string
@@ -24,7 +26,7 @@ export interface PaperRetrievalTraceStage {
   readonly kind: PaperRetrievalTraceStageKind
   readonly status: PaperRetrievalTraceStageStatus
   readonly durationMs: number
-  readonly method?: 'fts' | 'knn' | 'rrf' | 'dashscope-rerank'
+  readonly method?: 'fts' | 'bm25' | 'knn' | 'rrf' | 'dashscope-rerank'
   readonly reason?: string
   readonly candidates: readonly PaperRetrievalTraceCandidate[]
 }
@@ -61,7 +63,7 @@ export type PaperRetrievalTraceEventData = PaperRetrievalTraceEventDataV1 | Pape
 
 const STAGE_KINDS = new Set<PaperRetrievalTraceStageKind>(['sqlite', 'embedding', 'elasticsearch', 'fusion', 'rerank', 'final'])
 const STAGE_STATUSES = new Set<PaperRetrievalTraceStageStatus>(['completed', 'skipped', 'fallback', 'failed'])
-const METHODS = new Set(['fts', 'knn', 'rrf', 'dashscope-rerank'])
+const METHODS = new Set(['fts', 'bm25', 'knn', 'rrf', 'dashscope-rerank'])
 
 /** Strict decoder: malformed diagnostics never poison session-history replay. */
 export function decodePaperRetrievalTraceEventData(value: unknown): PaperRetrievalTraceEventData {
@@ -111,7 +113,7 @@ function decodeStage(value: unknown): PaperRetrievalTraceStage {
     kind: value.kind as PaperRetrievalTraceStageKind,
     status: value.status as PaperRetrievalTraceStageStatus,
     durationMs: value.durationMs,
-    ...(value.method === undefined ? {} : { method: value.method as 'fts' | 'knn' | 'rrf' | 'dashscope-rerank' }),
+    ...(value.method === undefined ? {} : { method: value.method as 'fts' | 'bm25' | 'knn' | 'rrf' | 'dashscope-rerank' }),
     ...(value.reason === undefined ? {} : { reason: value.reason }),
     candidates: value.candidates.map(decodeCandidate),
   }
@@ -122,7 +124,8 @@ function decodeCandidate(value: unknown): PaperRetrievalTraceCandidate {
     || typeof value.title !== 'string' || typeof value.section !== 'string' || typeof value.excerpt !== 'string'
     || !Number.isSafeInteger(value.pdfPageStart) || !Number.isSafeInteger(value.rank)
     || value.excerpt.length > 300 || !finiteOptional(value.score) || !finiteOptional(value.sqliteRank)
-    || !finiteOptional(value.elasticRank) || !finiteOptional(value.fusionScore)
+    || !finiteOptional(value.elasticRank) || !finiteOptional(value.elasticKeywordRank)
+    || !finiteOptional(value.elasticVectorRank) || !finiteOptional(value.fusionScore)
     || !finiteOptional(value.rerankScore)) {
     throw new TypeError('invalid paper retrieval trace candidate')
   }
@@ -132,6 +135,8 @@ function decodeCandidate(value: unknown): PaperRetrievalTraceCandidate {
     ...(value.score === undefined ? {} : { score: value.score as number }),
     ...(value.sqliteRank === undefined ? {} : { sqliteRank: value.sqliteRank as number }),
     ...(value.elasticRank === undefined ? {} : { elasticRank: value.elasticRank as number }),
+    ...(value.elasticKeywordRank === undefined ? {} : { elasticKeywordRank: value.elasticKeywordRank as number }),
+    ...(value.elasticVectorRank === undefined ? {} : { elasticVectorRank: value.elasticVectorRank as number }),
     ...(value.fusionScore === undefined ? {} : { fusionScore: value.fusionScore as number }),
     ...(value.rerankScore === undefined ? {} : { rerankScore: value.rerankScore as number }),
   }
