@@ -1,6 +1,7 @@
 # This repository contains the two source trees only.
 # Local workspace data at the aggregate root
 /.paperagent/
+/paperagent/docs/
 /.pnpm-store/
 /paperagent-recovery/
 
